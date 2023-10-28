@@ -62,7 +62,7 @@ while True:
         break
     
     prompt = """
-    Your goal is to generate a simple task for the user to do today. The task should not be complicated, should take very little time, should clearly assist with the user's goals and should easily fit into the user's schedule for the day. The user has previously indicated their goals to be the following: "[GOAL PLACEHOLDER]"
+    Your goal is to generate a simple task for the user to do today. The task should not be complicated, should take very little time, should clearly assist with the user's goals and should easily fit into the user's schedule for the day. The user has previously indicated their long-term goal(s) to be the following: "[GOAL PLACEHOLDER]"
     """.replace("[GOAL PLACEHOLDER]", goal)
 
     if len(past_goals) > 0:
