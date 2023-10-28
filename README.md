@@ -1,6 +1,11 @@
 # calhacks-transfer-app
 App to help community college students figure out their course plan, regardless of where they want to go.
 
+Utilizing:
+- MindsDB for data storage & preliminary data clean up with AI
+- together.ai for AI data processing on the user's end
+- ??? for frontend
+
 ---
 Idea
 
