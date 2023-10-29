@@ -3,9 +3,13 @@ from discord.app_commands import CommandTree
 import random
 import together
 import time
+import io
 import os
 import asyncio
 import functools
+import PIL
+from PIL import Image
+import glob
 from dotenv import load_dotenv
 
 load_dotenv(".env")
@@ -28,8 +32,14 @@ intents = discord.Intents.all()
 intents.presences = False
 intents.members = False
 
+puzzle_list = {}
+
 async def setup_hook():
-    pass
+    for filename in glob.glob('./puzzle/*.png'):
+        im=Image.open(filename)
+        name_proc = filename.split("/")[-1].replace(".png", "").split("_")
+        puzzle_list[(int(name_proc[0]), int(name_proc[1]))] = im
+
 
 client = discord.AutoShardedClient(intents=intents, allowed_mentions=allowed_mentions, chunk_guilds_at_startup=False)
 # client.activity = discord.Activity(
@@ -45,6 +55,8 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
+    global data
+
     if message.author.bot:
         return
     
@@ -52,9 +64,9 @@ async def on_message(message):
         await client.tree.sync(guild=None)
         await message.reply("Reloaded global")
 
-    if message.author.id == 396545298069061642 and message.content.lower() == "!reset":
+    if message.content.lower() == "!reset":
         data = {}
-        await message.reply("Reset data!")
+        await message.delete()
 
     if message.author.id == 396545298069061642 and message.content.lower() == "!openlifepuzzlebutton":
         embed=discord.Embed(title="Open LifePuzzle", description="Click the button below to open LifePuzzle.", color=0xfc766a)
@@ -63,16 +75,41 @@ async def on_message(message):
         buttons.add_item(discord.ui.Button(style=discord.ButtonStyle.green, label="Open LifePuzzle", row=1, custom_id="display_task_button", disabled=False))
         await message.channel.send(embed=embed, view=buttons)
 
-    if message.author.id == 396545298069061642 and message.content.lower() == "!demodata":
-        data = {396545298069061642: {
+    if message.content.lower() == "!demodata":
+        data[message.author.id] = {
             "task_complete": False,
             "resets": 1,
             "today_task": None,
-            "puzzle": [True] * 29,
+            "today_task_reasoning": None,
+            "puzzle": [True] * 27,
             "past_days": {},
             "goal": "eat healthier, talk to people more, be more fit"
-        }}
-        await message.reply("Reset data!")
+        }
+        await message.delete()
+
+    if message.content.lower() == "!demooops":
+        data[message.author.id] = {
+            "task_complete": True,
+            "resets": 1,
+            "today_task": "Take your dog out for a walk after lunch.",
+            "today_task_reasoning": "Taking your dog out after lunch will give you the opportunity to spend quality time with your dog, therefore achieving your goal of spending more time with your dog.",
+            "puzzle": [True] * 16 + [False] + [True] * 11,
+            "past_days": {},
+            "goal": "spend more time with my dog"
+        }
+        await message.delete()
+
+    if message.content.lower() == "!demohalf":
+        data[message.author.id] = {
+            "task_complete": True,
+            "resets": 1,
+            "today_task": None,
+            "today_task_reasoning": None,
+            "puzzle": [True] * 16,
+            "past_days": {},
+            "goal": "spend more time with my dog"
+        }
+        await message.delete()
 
     return
 
@@ -88,6 +125,19 @@ async def together_prompt(prompt):
         repetition_penalty = 1.1,
         stop = ['<human>', '\n\n']
         ))
+
+async def generate_puzzle(completion):
+    canvas = Image.new('RGBA', (1890, 1080), (0,0,0,0))
+    for y in range(4):
+        for x in range(7):
+            id = 7 * y + x
+            if len(completion) < id + 1 or completion[id] == False:
+                continue
+            else:
+                im = puzzle_list[(x, y)]
+                canvas.paste(im, (x * 270, y * 270))
+    
+    return canvas
 
 
 async def set_goal(interaction):
@@ -241,6 +291,8 @@ async def show_task(interaction: discord.Interaction):
 
     while True:
         embed=discord.Embed(title="Today's Task: " + data[user_id]["today_task"], description=data[user_id]["today_task_reasoning"], color=(0x90ee90 if data[user_id]["task_complete"] else 0xfc766a))
+        if data[user_id]["task_complete"]:
+            embed.add_field(name="Daily Task Complete!", value="You got 1 puzzle piece today! Keep it up!")
         embed.set_author(name="LifePuzzle")
 
         buttons = discord.ui.View()
@@ -252,7 +304,7 @@ async def show_task(interaction: discord.Interaction):
         if msg == None:
             msg = await interaction.followup.send(embed=embed, view=buttons)
         else:
-            await msg.edit(embed=embed, view=buttons)
+            await msg.edit(embed=embed, view=buttons, attachments=[])
 
 
         def check(m):
@@ -267,6 +319,9 @@ async def show_task(interaction: discord.Interaction):
         
         if interactionResponse.data['custom_id'] == "complete":
             data[user_id]["task_complete"] = not data[user_id]["task_complete"]
+            data[user_id]["puzzle"].append(True)
+
+            
 
         elif interactionResponse.data['custom_id'] == "reset":
             asyncio.create_task(msg.delete())
@@ -284,7 +339,29 @@ async def show_task(interaction: discord.Interaction):
             return
         
         elif interactionResponse.data['custom_id'] == "puzzle":
-            pass
+            final_img = await generate_puzzle(data[user_id]["puzzle"])
+            file_name = "generate" + str(random.randint(1,99999999)) + ".png"
+            image_bytes = io.BytesIO()
+            await client.loop.run_in_executor(None, functools.partial(final_img.save, image_bytes, "PNG", compress_level=4))
+            await client.loop.run_in_executor(None, image_bytes.seek, 0)
+
+            embed=discord.Embed(title="Your LifePuzzle", description=("You missed " + str(data[user_id]["puzzle"].count(False)) + " puzzle pieces, and you still have the chance to get " + str(28 - len(data[user_id]["puzzle"])) + " more pieces!" if data[user_id]["puzzle"].count(False) > 0 else str(28 - len(data[user_id]["puzzle"])) + " more puzzle pieces are waiting for you to collect them! Complete daily tasks to complete your collection!"), color=0xfc766a)
+            embed.set_author(name="LifePuzzle")
+            embed.set_image(url="attachment://" + file_name)
+            asyncio.create_task(msg.delete())
+            buttons = discord.ui.View()
+            buttons.add_item(discord.ui.Button(style=discord.ButtonStyle.grey, emoji="↩️", label="Back", custom_id="back"))
+            msg = await interactionResponse.followup.send(embed=embed, file=discord.File(fp=image_bytes, filename=file_name), view=buttons)
+
+            def check(m):
+                return m.type not in [discord.InteractionType.application_command, discord.InteractionType.autocomplete] and m.channel.id == interaction.channel.id and m.message.id == msg.id and m.user.id == user_id
+            try:
+                interactionResponse = await client.wait_for('interaction', timeout=30, check=check)
+            except asyncio.TimeoutError:
+                await msg.delete()
+                return
+            
+            await interactionResponse.response.defer()
 
         elif interactionResponse.data['custom_id'] == "goal":
             asyncio.create_task(msg.delete())
