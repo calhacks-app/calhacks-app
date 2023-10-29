@@ -319,7 +319,8 @@ async def show_task(interaction: discord.Interaction):
         
         if interactionResponse.data['custom_id'] == "complete":
             data[user_id]["task_complete"] = not data[user_id]["task_complete"]
-            data[user_id]["puzzle"].append(True)
+            if data[user_id]["task_complete"]:
+                data[user_id]["puzzle"].append(True)
 
             
 
