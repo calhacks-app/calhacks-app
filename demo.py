@@ -46,7 +46,7 @@ while True:
     else:
         print(reasoning)
         print()
-        action = input("Retry? (Y/N)").upper()
+        action = input("Enter a new goal? (Y/N) ").upper()
         if action == "Y":
             continue
         else:
