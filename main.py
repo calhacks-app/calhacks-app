@@ -128,11 +128,11 @@ async def set_goal(interaction):
     
     asyncio.create_task(result.delete())
     
-    goal = result.content.strip().replace('"', "")
+    goal = result.content.strip().replace('"', "").replace("\n", ", ").replace("   ", " ").replace("  ", " ")
 
     prompt = """
     The user has stated that they want their goal to be: "[GOAL PLACEHOLDER]"
-    """.replace("[GOAL PLACEHOLDER]", goal.strip())
+    """.replace("[GOAL PLACEHOLDER]", goal)
 
     prompt += """
     Is this a good long-term goal? Is this goal realistic, achievable, positive and clear?
@@ -244,7 +244,7 @@ async def show_task(interaction: discord.Interaction):
         embed.set_author(name="LifePuzzle")
 
         buttons = discord.ui.View()
-        buttons.add_item(discord.ui.Button(style=(discord.ButtonStyle.green if data[user_id]["task_complete"] else discord.ButtonStyle.grey), emoji="✅", custom_id="complete", disabled=data[user_id]["task_complete"]))
+        buttons.add_item(discord.ui.Button(style=(discord.ButtonStyle.green if data[user_id]["task_complete"] else discord.ButtonStyle.grey), emoji="✅", custom_id="complete", disabled=False))
         buttons.add_item(discord.ui.Button(style=discord.ButtonStyle.red, emoji="🔄", custom_id="reset", disabled=data[user_id]["resets"] == 0 or data[user_id]["task_complete"]))
         buttons.add_item(discord.ui.Button(style=discord.ButtonStyle.blurple, emoji="🧩", label="My LifePuzzle", custom_id="puzzle"))
         buttons.add_item(discord.ui.Button(style=discord.ButtonStyle.grey, emoji="📍", label="Change Goal", custom_id="goal"))
@@ -266,7 +266,7 @@ async def show_task(interaction: discord.Interaction):
         await interactionResponse.response.defer()
         
         if interactionResponse.data['custom_id'] == "complete":
-            data[user_id]["task_complete"] = True
+            data[user_id]["task_complete"] = not data[user_id]["task_complete"]
 
         elif interactionResponse.data['custom_id'] == "reset":
             asyncio.create_task(msg.delete())
